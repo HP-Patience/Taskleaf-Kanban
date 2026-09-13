@@ -1,5 +1,7 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Taskleaf-Kanban</title><style>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Taskleaf-Kanban</title><script>
+try { const saved = localStorage.getItem('taskleaf-theme'); document.documentElement.dataset.theme = ['light','dark'].includes(saved) ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch { document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+</script><style>
 :root{color-scheme:light;--bg:#f5f7f7;--ink:#202827;--muted:#66716e;--line:#dde4e1;--accent:#167456;--soft:#e8f3ed;--red:#b42332;font-synthesis:none}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Segoe UI","Microsoft YaHei",sans-serif}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.45}button,input,select,textarea{transition:background .16s,border-color .16s,box-shadow .16s}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #39987b;outline-offset:3px}[hidden]{display:none!important}
 .top{height:64px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 32px;gap:12px}.brand{font-weight:700;display:flex;gap:10px;align-items:center;font-size:16px}.mark{width:28px;height:28px;display:grid;place-items:center;border-radius:7px;background:var(--accent);color:#fff}.local-status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}.local-status:before{content:"";width:6px;height:6px;background:var(--accent);border-radius:50%}
@@ -13,12 +15,13 @@ dialog{padding:0;border:1px solid var(--line);border-radius:8px;width:min(510px,
 @media(max-width:1100px){.board{gap:12px;grid-template-columns:repeat(4,minmax(260px,1fr))}.main{padding:24px}.top{padding:0 24px}.archive-group{grid-template-columns:130px minmax(0,1fr);gap:12px}}
 @media(max-width:600px){.top{height:56px;padding:0 16px}.local-status{font-size:11px}.main{padding:24px 16px}.head{align-items:start;gap:10px;margin-bottom:20px}.head h1{font-size:22px}.head p{max-width:200px;font-size:12px}.eyebrow{font-size:10px}.head .primary{font-size:12px;padding:8px 10px;margin-top:20px}.tabs{gap:20px}.viewbar{flex-wrap:wrap;gap:0}.overview{width:100%;padding:10px 0;border-top:1px solid var(--line)}.meter{margin-left:auto}.toolbar{flex-wrap:wrap;gap:8px}.search{flex-basis:100%;max-width:none}.toolbar select{flex:1}.result-count{display:none}.board{grid-template-columns:repeat(4,minmax(280px,85vw));padding-bottom:16px}.drop{min-height:290px}.archive-group{grid-template-columns:1fr;gap:12px}.archive-heading{padding:0;display:flex;gap:10px;align-items:baseline}.archive-heading span{margin:0}.archive-cards{padding-left:12px;grid-template-columns:minmax(0,1fr)}.modal{padding:20px}.two{grid-template-columns:1fr 1fr}.card-actions .ghost{min-height:36px}.colhead .ghost{min-height:36px;width:36px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-</style></head><body>
-<header class="top"><div class="brand"><span class="mark" aria-hidden="true">✓</span>Taskleaf-Kanban</div><div class="local-status" id="saveStatus">本地保存</div></header>
+.data-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.error-copy{color:#b42332}#importPreview{max-height:240px;overflow:auto;white-space:pre-wrap}.local-status{flex-shrink:0}@media(max-width:600px){.top{height:auto;min-height:64px;flex-wrap:wrap;padding:12px 16px}.data-actions .ghost{font-size:12px}}</style><link rel="stylesheet" href="/src/appearance.css"></head><body>
+<header class="top"><div class="brand"><span class="mark" aria-hidden="true">✓</span>Taskleaf-Kanban</div><div class="top-actions"><div class="local-status" id="saveStatus">正在连接服务器…</div><div class="settings-wrap" id="settingsWrap"><button class="ghost header-button" id="settingsToggle" aria-expanded="false" aria-controls="settingsPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg><span>设置</span></button><section id="settingsPanel" class="settings-panel" aria-label="设置" hidden><div class="settings-heading">数据管理</div><button id="importJson" class="ghost settings-item">导入 JSON<span>从文件添加任务</span></button><button id="exportJson" class="ghost settings-item">导出 JSON<span>下载当前任务备份</span></button></section></div><button class="ghost header-button theme-button" id="themeToggle" aria-label="切换到深色模式" title="切换到深色模式"><svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4a8.5 8.5 0 1 0 11.5 11.5Z"/></svg><svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button></div></header>
 <main class="main">
 <section class="head"><div><div class="eyebrow">WORKSPACE / 工作空间</div><h1 id="pageTitle">项目工作台</h1><p id="pageDescription">专注当下，让每一项任务向前一步。</p></div><button class="primary" id="add">＋ 新建任务</button></section>
 <div class="viewbar"><nav class="tabs" aria-label="工作空间视图"><button class="tab" id="boardBtn" aria-current="page">看板 <span class="tab-count" id="activeCount">0</span></button><button class="tab" id="archiveBtn">归档 <span class="tab-count" id="archiveCount">0</span></button></nav><div class="overview"><span id="summary"></span><div class="meter" id="progress" role="progressbar" aria-label="任务完成比例" aria-valuemin="0" aria-valuemax="100"><span class="meter-fill" id="progressFill"></span></div></div></div>
 <div id="storageWarning" class="storage-warning" role="alert" hidden></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
 <section class="toolbar" aria-label="筛选任务"><div class="search"><span aria-hidden="true"></span><input id="q" type="search" placeholder="搜索任务、标签…" aria-label="搜索任务"></div><select id="pf" aria-label="优先级"><option value="all">所有优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select><button class="ghost" id="clear">清除筛选</button><span class="result-count" id="resultCount"></span></section>
 <section class="board" id="board" aria-label="任务看板"></section></main>
 <dialog id="dlg" aria-labelledby="mt"><form class="modal" id="form"><div class="mh"><h2 id="mt">新建任务</h2><button type="button" class="close" id="x" aria-label="关闭弹窗">×</button></div><div class="fields">
@@ -26,138 +29,8 @@ dialog{padding:0;border:1px solid var(--line);border-radius:8px;width:min(510px,
 <div class="field"><label for="desc">描述</label><textarea id="desc" maxlength="500" placeholder="补充背景或验收标准（选填）"></textarea></div>
 <div class="fields two"><div class="field"><label for="pri">优先级</label><select id="pri"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select></div><div class="field"><label for="st">状态</label><select id="st"><option value="todo">待处理</option><option value="doing">进行中</option><option value="review">待验收</option><option value="done">已完成</option></select></div></div>
 <div class="fields two"><div class="field"><label for="due">截止日期</label><input id="due" type="date"></div><div class="field"><label for="tag">标签</label><input id="tag" maxlength="18" placeholder="例如：开发"></div></div></div>
-<div class="actions"><button type="button" class="ghost" id="cancel">取消</button><button class="primary" type="submit">保存任务</button></div></form></dialog>
+<p id="formError" role="alert" class="error-copy"></p><div class="actions"><button type="button" class="ghost" id="cancel">取消</button><button class="primary" type="submit">保存任务</button></div></form></dialog>
 <dialog id="confirm" aria-labelledby="confirmTitle"><form class="modal" method="dialog"><div class="mh"><h2 id="confirmTitle">删除任务</h2><button type="button" class="close" id="cx" aria-label="关闭删除确认">×</button></div><p class="muted" id="deleteCopy">确定删除这个任务吗？删除后无法恢复。</p><div class="actions"><button class="ghost" value="cancel" autofocus>取消</button><button class="danger" value="yes">删除任务</button></div></form></dialog>
-<div class="toast" id="toast" role="status" aria-live="polite"></div><script type="module">
-const cols=[['todo','待处理'],['doing','进行中'],['review','待验收'],['done','已完成']],seed=[{id:'1',title:'整理用户反馈与问题清单',desc:'汇总本周访谈内容，标记高频问题。',pri:'high',who:'林晓',due:'2026-09-12',tag:'研究',st:'todo'},{id:'2',title:'完成看板移动端适配',desc:'检查横向滚动和触控操作。',pri:'medium',who:'陈默',due:'2026-09-14',tag:'开发',st:'doing'},{id:'3',title:'评审上线前验收清单',desc:'确认核心流程、空状态和错误提示。',pri:'medium',who:'周宁',due:'2026-09-11',tag:'验收',st:'review'},{id:'4',title:'发布本周迭代总结',desc:'同步进展、风险与下周计划。',pri:'low',who:'林晓',due:'2026-09-10',tag:'运营',st:'done'}];
-const $ = selector => document.querySelector(selector);
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const localDay = () => { const d = new Date(); return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-'); };
-const dateLabel = day => /^\d{4}-\d{2}-\d{2}$/.test(day) ? day.slice(0,4)+'年'+day.slice(5,7)+'月'+day.slice(8,10)+'日' : '未记录日期';
-let data = [], edit = null, remove = null, archivePage = false, storageBlocked = false, toastTimer;
-function storageWarning(text) {
-  $('#storageWarning').hidden = false;
-  $('#storageWarning').textContent = text;
-  $('#saveStatus').textContent = '保存异常';
-}
-try {
-  const raw = localStorage.getItem('task-board-v1');
-  data = raw === null ? structuredClone(seed) : JSON.parse(raw);
-  if (!Array.isArray(data) || data.some(t => !t || typeof t.id !== 'string' || typeof t.title !== 'string' || !cols.some(c => c[0] === t.st))) throw new Error('Invalid data');
-} catch (error) {
-  data = []; storageBlocked = true;
-  storageWarning('无法读取本地任务数据，原始数据未被覆盖。请检查浏览器存储设置或备份后修复数据。');
-}
-function commit(next) {
-  if (storageBlocked) { note('本地数据读取异常，暂时无法保存'); return false; }
-  try {
-    localStorage.setItem('task-board-v1', JSON.stringify(next)); data = next;
-    $('#storageWarning').hidden = true; $('#saveStatus').textContent = '已保存到本地'; return true;
-  } catch (error) { storageWarning('保存失败，请检查浏览器存储权限或可用空间；本次操作未保存。'); return false; }
-}
-function note(message) {
-  clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').classList.add('show');
-  toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 2600);
-}
-function render() {
-  const q = $('#q').value.trim().toLowerCase(), priority = $('#pf').value;
-  const active = data.filter(t => !t.archived), archived = data.filter(t => t.archived);
-  const source = archivePage ? archived : active;
-  const visible = source.filter(t => (!q || [t.title,t.desc,t.tag,t.who].join(' ').toLowerCase().includes(q)) && (priority === 'all' || t.pri === priority));
-  $('#activeCount').textContent = active.length; $('#archiveCount').textContent = archived.length;
-  const completed = active.filter(t => t.st === 'done').length;
-  const percent = active.length ? Math.round(completed / active.length * 100) : 0;
-  $('#summary').textContent = archivePage ? archived.length+' 项已归档' : completed+' / '+active.length+' 项已完成';
-  $('#progress').hidden = archivePage; $('#progress').setAttribute('aria-valuenow', percent);
-  $('#progressFill').style.width = percent+'%';
-  $('#resultCount').textContent = visible.length+' 项任务'; $('#clear').disabled = !q && priority === 'all';
-  $('#board').classList.toggle('archive', archivePage);
-  $('#board').setAttribute('aria-label', archivePage ? '归档任务' : '任务看板');
-  $('#board').innerHTML = archivePage ? archiveGroups(visible, !!q || priority !== 'all') : cols.map(([status,label]) => {
-    const tasks = visible.filter(t => t.st === status);
-    return '<section class="col" data-status="'+status+'"><div class="colhead"><span class="status-dot" aria-hidden="true"></span>'+label+'<span class="count">'+tasks.length+'</span><button class="ghost" data-add="'+status+'" aria-label="在'+label+'中新建任务" title="新建任务">＋</button></div><div class="drop" data-st="'+status+'">'+(tasks.length ? tasks.map(card).join('') : '<div class="empty">'+(q || priority !== 'all' ? '没有匹配的任务' : '暂无任务')+'</div>')+'</div></section>';
-  }).join('');
-  drag();
-}
-function archiveGroups(tasks, filtered) {
-  if (!tasks.length) return '<div class="empty archive-empty"><strong>'+(filtered ? '没有匹配的归档任务' : '归档暂时为空')+'</strong>'+(filtered ? '试试其他关键词或清除筛选。' : '已完成的任务归档后，将按日期保存在这里。')+'</div>';
-  const groups = new Map();
-  tasks.forEach(t => { const date = /^\d{4}-\d{2}-\d{2}$/.test(t.archivedAt || '') ? t.archivedAt : ''; if (!groups.has(date)) groups.set(date, []); groups.get(date).push(t); });
-  return [...groups.keys()].sort((a,b) => b.localeCompare(a)).map(date => '<section class="archive-group"><h2 class="archive-heading">'+dateLabel(date)+'<span>'+groups.get(date).length+' 项任务</span></h2><div class="archive-cards">'+groups.get(date).map(card).join('')+'</div></section>').join('');
-}
-function card(t) {
-  const id = esc(t.id), priority = ['high','medium','low'].includes(t.pri) ? t.pri : 'medium';
-  const overdue = t.due && t.due < localDay() && t.st !== 'done' && !t.archived;
-  const action = t.archived || t.st === 'done' ? '<button class="ghost" data-archive="'+id+'">'+(t.archived ? '恢复' : '归档')+'</button>' : '';
-  return '<article class="task" draggable="'+(!t.archived)+'" data-id="'+id+'" aria-label="'+esc(t.title)+'"><div class="task-top"><span class="pill '+priority+'">'+({high:'高优先级',medium:'中优先级',low:'低优先级'}[priority])+'</span>'+(t.tag ? '<span class="tag" title="'+esc(t.tag)+'">'+esc(t.tag)+'</span>' : '')+'</div><div class="title">'+esc(t.title)+'</div>'+(t.desc ? '<p class="description">'+esc(t.desc)+'</p>' : '')+'<div class="row meta-row">'+(t.due ? '<span class="due '+(overdue ? 'overdue' : '')+'">'+(overdue ? '已逾期 · ' : '截止 ')+'<time datetime="'+esc(t.due)+'">'+esc(t.due)+'</time></span>' : '<span>未设截止日期</span>')+(t.who ? '<span class="avatar" title="'+esc(t.who)+'">'+esc(t.who)+'</span>' : '')+'</div><div class="row card-actions"><button class="ghost" data-edit="'+id+'">编辑</button>'+action+'<button class="ghost" data-del="'+id+'">删除</button></div></article>';
-}
-function setView(archive) {
-  if (archivePage === archive) return;
-  archivePage = archive;
-  $('#boardBtn').removeAttribute('aria-current'); $('#archiveBtn').removeAttribute('aria-current');
-  $(archive ? '#archiveBtn' : '#boardBtn').setAttribute('aria-current','page');
-  $('#pageTitle').textContent = archive ? '任务归档' : '项目工作台';
-  $('#pageDescription').textContent = archive ? '每一份完成，都有迹可循。' : '专注当下，让每一项任务向前一步。';
-  $('#add').hidden = archive; $('#q').value = ''; $('#pf').value = 'all'; render();
-  $('#board').scrollLeft = 0; $('#board').classList.remove('view-enter');
-  void $('#board').offsetWidth; $('#board').classList.add('view-enter');
-}
-function openForm(id, status) {
-  edit = id || null; const task = data.find(t => t.id === edit) || {};
-  $('#mt').textContent = edit ? '编辑任务' : '新建任务';
-  ['title','desc','pri','due','tag','st'].forEach(key => { $('#'+key).value = task[key] || (key === 'pri' ? 'medium' : key === 'st' ? status || 'todo' : ''); });
-  $('#title').setCustomValidity(''); $('#dlg').showModal(); $('#title').focus();
-}
-function drag() {
-  if (archivePage) return;
-  const clearDrag = () => document.querySelectorAll('.over,.drag,.drop-before').forEach(el => el.classList.remove('over','drag','drop-before'));
-  document.querySelectorAll('.task').forEach(el => {
-    el.ondragstart = event => { el.classList.add('drag'); event.dataTransfer.setData('text/plain',el.dataset.id); event.dataTransfer.effectAllowed = 'move'; };
-    el.ondragend = clearDrag;
-  });
-  document.querySelectorAll('.drop[data-st]').forEach(zone => {
-    zone.ondragover = event => { event.preventDefault(); zone.classList.add('over'); document.querySelectorAll('.drop-before').forEach(el => el.classList.remove('drop-before')); const before = [...zone.querySelectorAll('.task:not(.drag)')].find(el => event.clientY < el.getBoundingClientRect().top+el.offsetHeight/2); if (before) before.classList.add('drop-before'); };
-    zone.ondragleave = event => { if (!zone.contains(event.relatedTarget)) { zone.classList.remove('over'); zone.querySelectorAll('.drop-before').forEach(el => el.classList.remove('drop-before')); } };
-    zone.ondrop = event => {
-      event.preventDefault(); const id = event.dataTransfer.getData('text/plain'), task = data.find(t => t.id === id);
-      if (!task || task.archived) { clearDrag(); return; }
-      const beforeId = zone.querySelector('.drop-before')?.dataset.id;
-      const next = data.filter(t => t.id !== id), moved = {...task,st:zone.dataset.st};
-      const index = beforeId ? next.findIndex(t => t.id === beforeId) : -1;
-      if (index < 0) next.push(moved); else next.splice(index,0,moved);
-      clearDrag(); if (commit(next)) { render(); note('任务位置已更新'); }
-    };
-  });
-}
-$('#add').onclick = () => openForm();
-$('#boardBtn').onclick = () => setView(false); $('#archiveBtn').onclick = () => setView(true);
-$('#x').onclick = $('#cancel').onclick = () => $('#dlg').close();
-$('#cx').onclick = () => $('#confirm').close('cancel');
-$('#title').oninput = () => $('#title').setCustomValidity('');
-$('#form').onsubmit = event => {
-  event.preventDefault(); const title = $('#title').value.trim();
-  if (!title) { $('#title').setCustomValidity('请输入任务标题'); $('#title').reportValidity(); return; }
-  const values = {title,desc:$('#desc').value.trim(),pri:$('#pri').value,due:$('#due').value,tag:$('#tag').value.trim(),st:$('#st').value};
-  const next = edit ? data.map(t => t.id === edit ? {...t,...values} : t) : [...data,{id:crypto.randomUUID(),who:'',...values}];
-  if (commit(next)) { $('#dlg').close(); render(); note(edit ? '任务已更新' : '任务已创建'); }
-};
-document.addEventListener('click', event => {
-  const add = event.target.closest('[data-add]'), editButton = event.target.closest('[data-edit]'), archive = event.target.closest('[data-archive]'), del = event.target.closest('[data-del]');
-  if (add) openForm(null,add.dataset.add);
-  if (editButton) openForm(editButton.dataset.edit);
-  if (archive) {
-    const task = data.find(t => t.id === archive.dataset.archive); if (!task || (!task.archived && task.st !== 'done')) return;
-    const next = data.map(t => t.id === task.id ? {...t,archived:!t.archived,archivedAt:t.archived ? '' : localDay()} : t);
-    if (commit(next)) { render(); $(archivePage ? '#archiveBtn' : '#boardBtn').focus({preventScroll:true}); note(task.archived ? '任务已恢复到看板' : '任务已归档'); }
-  }
-  if (del) { remove = del.dataset.del; $('#confirm').returnValue = 'cancel'; $('#deleteCopy').textContent = '确定删除「'+(data.find(t => t.id === remove)?.title || '')+'」吗？删除后无法恢复。'; $('#confirm').showModal(); }
-});
-$('#confirm').onclose = () => {
-  if ($('#confirm').returnValue === 'yes' && remove && commit(data.filter(t => t.id !== remove))) { render(); note('任务已删除'); }
-  remove = null;
-};
-['q','pf'].forEach(id => $('#'+id).addEventListener('input',render));
-$('#clear').onclick = () => { $('#q').value = ''; $('#pf').value = 'all'; render(); };
-render();
-</script></body></html>
+<dialog id="importDialog" aria-labelledby="importTitle"><div class="modal"><h2 id="importTitle">导入预览</h2><p id="importSummary"></p><pre id="importPreview"></pre><p id="importError" role="alert" class="error-copy"></p><div class="actions"><button class="ghost" id="importClose">取消</button><button class="primary" id="importConfirm">确认导入</button></div></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div><script type="module" src="/src/board.js"></script></body></html>
 

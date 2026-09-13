@@ -1,0 +1,23 @@
+[Unit]
+Description=Taskleaf-Kanban API
+After=network.target
+
+[Service]
+Type=simple
+User=taskleaf
+Group=taskleaf
+WorkingDirectory=/opt/taskleaf/current
+EnvironmentFile=/etc/taskleaf/taskleaf.env
+ExecStart=/usr/bin/node server/server.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/taskleaf /var/backups/taskleaf
+
+[Install]
+WantedBy=multi-user.target

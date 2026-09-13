@@ -1,0 +1,6 @@
+# Preserve executable scripts and configuration on Linux deployment hosts.
+*.sh text eol=lf
+*.yml text eol=lf
+*.service text eol=lf
+*.timer text eol=lf
+*.js text eol=lf

@@ -1,61 +1,96 @@
 # Taskleaf-Kanban
 
-轻量的本地任务看板。使用 HTML、CSS 和原生 JavaScript 构建，通过 Vite 开发与打包，无运行时框架依赖。
-
-## 界面预览
-
-![Taskleaf 任务看板：四列工作流、优先级与任务操作](docs/images/taskleaf-board.png)
-
-截图使用演示数据，不包含个人任务。
+个人任务看板：原生 HTML / CSS / JavaScript 前端，Vite 构建，Express API，JSON 文件持久化。不需要数据库、React、Vue 或 PM2。
 
 ## 功能
 
-- 待处理、进行中、待验收、已完成四列看板
-- 新建、编辑、删除任务，以及标题必填校验和删除确认
-- 优先级、标签、描述与截止日期
-- 跨列拖拽与列内排序
-- 搜索与优先级筛选
-- 已完成任务归档、按归档日期倒序分组、恢复任务
-- localStorage 本地持久化
-- 响应式布局、键盘焦点反馈和减少动态效果设置
+- 待处理、进行中、待验收、已完成四列，支持编辑、删除、拖拽排序、搜索、优先级筛选。
+- 归档与恢复、标签、描述、负责人兼容字段、截止日期。
+- 同一服务的浏览器共享任务；刷新读取最新数据，不是实时协作。
+- 保存失败保留表单输入；旧版本修改返回冲突，不静默覆盖。
+- JSON 导入预览、同 ID 去重、冲突拒绝、导出备份。
+- 服务端串行写入、临时文件替换、最后有效版本 `.bak` 备份。
 
-## 运行
+## 本地运行
 
-需要 Node.js 20.19+（20.x）或 22.12+，以及 npm。建议使用 Node.js 24。
-
-在仓库目录安装依赖并启动开发服务器：
+使用 Node.js 24 和 npm：
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-访问 `http://127.0.0.1:4173/task-board.html`，或打开根地址自动进入看板。
+同时启动前端与后端：
 
-### 构建与预览
+- 页面：`http://127.0.0.1:4173/task-board.html`
+- API：`http://127.0.0.1:3000/api/tasks`（仅回环监听）
+- 数据：项目下 `data/tasks.json`，自动初始化为空看板，已被 Git 忽略。
+
+在 Chrome 和 Edge 打开同一个页面地址即可共享数据。后端代码修改后重启 `npm run dev`；也可分别使用 `npm run dev:api`（监听代码变化）与 `npm run dev:web`。
+
+不能只打开 HTML 文件，也不能只启动静态预览而不启动 API。构建预览需要分别启动 `npm start` 与 `npm run preview`，页面端口为 4174。
+
+## 数据管理
+
+任务统一由后端保存在 JSON 文件中，页面打开时读取，保存成功后更新看板。其他浏览器修改后，使用浏览器自带刷新读取最新任务；不提供独立“刷新数据”按钮。
+
+右上角“设置”菜单提供“导出 JSON”和“导入 JSON”。旁边的明暗切换按钮可切换主题：首次跟随系统，手动选择后保存在当前浏览器（仅主题偏好，不保存任务）。导入前显示预览；ID 相同、内容相同的任务跳过，ID 相同而内容不同则拒绝整个导入，不静默覆盖。
+
+不再提供浏览器旧任务迁移入口，也不读取或删除原来的 localStorage 数据。
+
+## 保存与冲突
+
+任务文件包含 `schemaVersion: 1`、递增 `revision` 和 `tasks`。修改请求必须带读取时的 revision。
+
+如果其他窗口已修改数据，本次修改会失败，表单输入保留。复制草稿，关闭窗口，使用浏览器刷新页面，重新打开任务核对后重试。网络中断时结果可能未确认，先刷新核对；不会悄悄改存 localStorage。
+
+仅允许一个后端进程写同一文件，不启动多实例。总任务上限 10000 项、规范化数据上限 4 MB，请求上限 5 MB；超出会明确拒绝。
+
+## 测试与构建
 
 ```sh
+npm test
 npm run build
-npm run preview
+npx playwright install chromium
+npm run test:e2e
 ```
 
-构建产物位于 `dist/`，预览地址为 `http://127.0.0.1:4174/task-board.html`。部署时将整个 `dist/` 目录上传至静态托管服务；根入口和 `task-board.html` 均保留。
+浏览器测试使用独立临时数据与端口 5179 / 3019，不接触日常数据。已安装 Chrome 或 Edge 时可以通过 `E2E_CHANNEL=chrome` 或 `E2E_CHANNEL=msedge` 运行；PowerShell 示例：
 
-开发端口固定为 4173，端口占用时会明确报错，不会自动切换导致本地数据看似丢失。可以使用 `npm run dev -- --port 5173` 手动换端口，但新端口不会共享原来的任务数据。
+```powershell
+$env:E2E_CHANNEL = 'msedge'
+npm run test:e2e
+```
 
-## 数据说明
+`dist/` 是前端产物，不含后端；生产发布也必须包含后端与生产依赖。
 
-- 数据仅存储在当前浏览器的 localStorage 中，键名为 `task-board-v1`。
-- 未配置服务器、数据库、账户系统或跨设备同步。
-- 不同浏览器、地址、协议或端口不会自动共享任务数据；直接打开文件时的存储行为取决于浏览器。
-- 清理浏览器站点数据可能丢失任务，重要信息请自行备份。
-- 首次打开包含演示任务；归档按浏览器本地日期记录。
+## 备份与恢复
 
-## 文件
+```sh
+npm run backup
+```
 
-- `task-board.html`：页面结构、样式与交互逻辑；Vite 构建时处理内联模块脚本。
-- `index.html`：根地址入口，跳转至看板。
-- `vite.config.js`：开发、预览端口与多页面构建配置。
-- `docs/images/taskleaf-board.png`：README 界面截图。
-- `package-lock.json`：锁定依赖版本；已有锁文件时可使用 `npm ci` 安装。
+默认从 `data/tasks.json` 生成 `backups/` 下的时间戳快照。可用 `DATA_FILE` 与 `BACKUP_DIR` 改路径。`.bak` 只保留上一次有效版本，不替代定期或异地备份。
 
+需要完整恢复时，先停止所有后端写入进程，再执行：
+
+```sh
+npm run restore -- --offline-confirmed /absolute/path/backup.json
+```
+
+恢复前保留原始文件（即使已损坏），恢复时提升 revision 以使旧窗口失效。之后重新启动服务，并刷新所有浏览器。恢复前请确认路径和备份内容；正常“导入 JSON”是合并，不等于完整回滚恢复。
+
+## 部署与安全边界
+
+服务端 JSON 必须放在发布目录之外。使用 systemd 管理 Node，Nginx 提供前端与 `/api/` 代理。
+
+**目前不含应用层登录。后端只允许回环监听；Nginx 模板默认仅监听回环且拒绝所有访问，必须在确定访问来源与保护传输方式后配置。不要直接将开发服务器或无保护 API 暴露到公网。**
+
+CI 在 push / PR 时测试和构建。只有仓库变量 `DEPLOY_ENABLED=true`、生产环境与 SSH Secrets 配齐后，才自动部署 main；当前未启用服务器部署。
+
+详见：
+
+- [产品需求](docs/PRD.md)
+- [技术选型](docs/TECH_STACK.md)
+- [服务器配置、CI/CD 与恢复操作](docs/DEPLOYMENT.md)
+- [任务完成后的提交确认规则](agent.md)

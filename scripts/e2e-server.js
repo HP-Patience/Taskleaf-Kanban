@@ -1,0 +1,14 @@
+import {mkdtemp} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {createServer} from 'vite';
+import {Store} from '../server/store.js';
+import {createApp} from '../server/server.js';
+const directory = await mkdtemp(join(tmpdir(),'taskleaf-e2e-'));
+const store = new Store(join(directory,'tasks.json')); await store.init();
+const api = createApp(store,{allowedHosts:['127.0.0.1:5179']}).listen(3019,'127.0.0.1');
+await new Promise((resolve,reject)=>{api.once('listening',resolve);api.once('error',reject);});
+const vite = await createServer({server:{host:'127.0.0.1',port:5179,strictPort:true,proxy:{'/api':{target:'http://127.0.0.1:3019'}}}});
+await vite.listen();
+console.log('Isolated browser test server ready');
+for (const signal of ['SIGINT','SIGTERM']) process.on(signal,async()=>{await vite.close();api.close();});

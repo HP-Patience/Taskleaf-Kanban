@@ -1,0 +1,15 @@
+[Unit]
+Description=Taskleaf JSON snapshot backup
+
+[Service]
+Type=oneshot
+User=taskleaf
+Group=taskleaf
+WorkingDirectory=/opt/taskleaf/current
+EnvironmentFile=/etc/taskleaf/taskleaf.env
+ExecStart=/usr/bin/node scripts/backup.js
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/taskleaf

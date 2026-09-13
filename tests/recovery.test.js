@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp, readFile, writeFile, readdir, unlink} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join, resolve} from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {Store} from '../server/store.js';
+import {task} from '../src/schema.js';
+
+const run = (script, env, args=[]) => spawnSync(process.execPath,[resolve('scripts',script),...args],{env:{...process.env,...env},encoding:'utf8'});
+test('backup and offline restore preserve tasks and invalidate old revisions',async()=>{
+  const dir = await mkdtemp(join(tmpdir(),'taskleaf-recovery-'));
+  const file = join(dir,'tasks.json'), backups = join(dir,'backups');
+  const env = {DATA_FILE:file,BACKUP_DIR:backups};
+  const store = new Store(file); await store.init();
+  const saved = await store.mutate(0,()=>[task({id:'restore-test',title:'保留字段',desc:'备份内容',st:'done',archived:true,archivedAt:'2026-09-14'})]);
+  const result = run('backup.js',env); assert.equal(result.status,0,result.stderr);
+  const backup = join(backups,(await readdir(backups))[0]);
+  assert.deepEqual(JSON.parse(await readFile(backup,'utf8')),saved);
+  await store.mutate(1,()=>[]);
+  const original = await readFile(file,'utf8');
+  assert.notEqual(run('restore.js',env,[backup]).status,0);
+  assert.equal(await readFile(file,'utf8'),original);
+  const restored = run('restore.js',env,['--offline-confirmed',backup]);
+  assert.equal(restored.status,0,restored.stderr);
+  const current = await store.read();
+  assert.deepEqual(current.tasks,saved.tasks); assert.ok(current.revision>2);
+  const preserved = (await readdir(dir)).find(name=>name.includes('.before-restore-'));
+  assert.equal(await readFile(join(dir,preserved),'utf8'),original);
+});
+test('invalid backup cannot overwrite live bytes; valid backup repairs corruption',async()=>{
+  const dir = await mkdtemp(join(tmpdir(),'taskleaf-repair-'));
+  const file = join(dir,'tasks.json'), backup = join(dir,'snapshot.json');
+  const env = {DATA_FILE:file}; const broken = '{ damaged live file';
+  await writeFile(file,broken); await writeFile(backup,'invalid backup');
+  assert.notEqual(run('restore.js',env,['--offline-confirmed',backup]).status,0);
+  assert.equal(await readFile(file,'utf8'),broken);
+  await writeFile(backup,JSON.stringify({schemaVersion:1,revision:4,tasks:[]}));
+  const result = run('restore.js',env,['--offline-confirmed',backup]);
+  assert.equal(result.status,0,result.stderr);
+  assert.deepEqual((await new Store(file).read()).tasks,[]);
+  const preserved = (await readdir(dir)).find(name=>name.includes('.before-restore-'));
+  assert.equal(await readFile(join(dir,preserved),'utf8'),broken);
+});
+test('missing data after startup is not silently recreated by a mutation',async()=>{
+  const dir = await mkdtemp(join(tmpdir(),'taskleaf-missing-'));
+  const store = new Store(join(dir,'tasks.json')); await store.init(); await unlink(store.file);
+  await assert.rejects(store.mutate(0,()=>[]),{code:'ENOENT'});
+  await assert.rejects(readFile(store.file),{code:'ENOENT'});
+});
