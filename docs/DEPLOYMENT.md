@@ -1,10 +1,10 @@
 # 部署与运维操作说明
 
-这是待配置的部署模板，不代表已经连接服务器。用户已选择公网 IP＋端口，不要求域名；实际 IP、端口、服务器系统及访问保护仍需确认。
+首次服务器安装已完成：Taskleaf 由 systemd 管理并已开启开机自启，Nginx 和 API 仅监听服务器回环地址；已验证页面和健康接口，并由用户确认 SSH 隧道访问正常。目前公网 IP＋端口直接访问及 GitHub Actions 自动部署尚未启用，仍需确认访问保护和配置部署凭据。本文保留通用占位符，不提交真实凭据。
 
 ## 1. 上线前的必备条件
 
-- Linux + systemd、Node.js 24、npm、Nginx、SSH、tar、curl。
+- Linux + systemd、Node.js、npm、Nginx、SSH、tar、curl。首次安装脚本接受 Node.js 22.12+（22.x）或 24+；当前服务器使用 22.23.2，CI 使用 24，不需要为本项目升级服务器全局运行时。
 - 网站端口、后端端口和 SSH 端口分开考虑。模板示例为网站 8080、后端 3000；脚本健康检查固定使用 3000，改后端端口时需同步修改。
 - 后端只监听回环；云安全组和系统防火墙不放行后端端口。
 - 确认谁可访问网页与 API，以及如何保护传输。当前不含账号系统；IP 白名单不加密 HTTP，不能据此认为公网传输安全。
@@ -83,3 +83,54 @@
 - 服务重启与第二次发布后，任务和归档还在。
 - 一次独立备份、恢复演练能恢复字段和顺序。
 - 检查 systemd 日志与 GitHub Actions 日志，确认没有泄露凭据或任务内容。
+
+## 8. 辅助首次安装（手动 sudo）
+
+`deploy/bootstrap.sh` 只用于全新安装。先在本地构建，将不含真实任务、凭据和 node_modules 的发布包及脚本上传至部署用户的独立目录。该目录需包含 `bootstrap.sh`、`release.tgz`、`release.sha256` 和 `release-id`。
+
+管理员在自己的 SSH 终端执行（替换实际上传目录）：
+
+```bash
+sudo bash /home/DEPLOY_USER/taskleaf-bootstrap/RELEASE/bootstrap.sh /home/DEPLOY_USER/taskleaf-bootstrap/RELEASE
+```
+
+- 脚本核对校验和、运行环境、端口及已有安装；不会升级系统 Node.js。已有 Taskleaf 目录、账号或配置时拒绝覆盖。
+- 创建专用服务用户、独立数据目录及 systemd 服务；仅新增 Taskleaf Nginx 配置并在校验通过后 reload。
+- 初次监听固定为服务器回环地址：API `127.0.0.1:3000`，Nginx `127.0.0.1:8080`。不开放公网端口、不修改防火墙、不配置 sudoers 或 GitHub Secrets。
+- sudo 密码只在自己的终端输入，不要发到聊天或写进脚本。中途失败时保留输出，先检查部分安装状态，不要删除数据或盲目重跑。
+- 安装输出成功后，在本地另一终端建立 SSH 隧道，再浏览 `http://127.0.0.1:18080/task-board.html`：
+
+```bash
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18080:127.0.0.1:8080 DEPLOY_USER@SERVER_IP
+```
+
+这是首次验证的临时访问方式，不代表公网访问和 CI/CD 已启用；二者需在访问保护与部署凭据确认后另行配置。
+
+### npm 下载中断后的续装
+
+若首次安装仅在 `npm ci` 阶段出现网络错误，先检查服务用户、正式数据目录、systemd 单元和 Nginx 配置均未创建。不要直接重跑或删除 `/opt/taskleaf`。
+
+可在网络正常的机器中，以相同 package.json 和 package-lock.json 在独立目录执行 `npm ci --omit=dev --ignore-scripts --no-audit --no-fund --cache <独立缓存目录>`，只传输该缓存的 `_cacache`，不传输本机 node_modules 或用户全局缓存。服务器在该发布目录以部署用户执行 `npm ci --offline --omit=dev --ignore-scripts --no-audit --no-fund --cache <上传的缓存目录>`，由锁文件校验完整性并在服务器安装依赖。此操作不修改全局 registry，也不升级包。
+
+离线安装及模块导入验证通过后，管理员可以使用相同发布包续装：
+
+```bash
+sudo bash /absolute/bundle-directory/bootstrap.sh /absolute/bundle-directory --resume-after-deps
+```
+
+续装仍检查端口和正式安装路径，逐一核对发布包中的源文件哈希，并验证生产依赖；跳过解压和联网安装。该入口仅处理服务配置之前的依赖阶段失败，不用于一般升级或数据恢复。后续 CI 依赖下载通道仍需另行验证，不能由本次离线安装推断自动部署已可用。
+
+### Windows 本地端口与 SSH 隧道
+
+本项目实际遇到 Windows 将 8072–8171 列为 TCP 保留端口，绑定本地 8080 返回 `Permission denied`。因此上述隧道改用本地 18080；服务器 Nginx 仍使用 127.0.0.1:8080，API 仍使用 127.0.0.1:3000。该范围是当时该机器的检查结果，不代表其他机器的端口范围。
+
+在 Windows 本地 PowerShell（不是服务器终端）运行隧道命令，并保持窗口打开；浏览器访问 `http://127.0.0.1:18080/task-board.html`。断开隧道只会中断本地访问，不会停止服务器服务。
+
+排查本地端口时可执行：
+
+```powershell
+netsh interface ipv4 show excludedportrange protocol=tcp
+Get-NetTCPConnection -State Listen | Where-Object LocalPort -eq 18080
+```
+
+后端会校验包含端口的 Host，所以不能只改 SSH 命令而不调整白名单。新版首次安装脚本已包含 `127.0.0.1:18080` 和 `localhost:18080`；旧安装如未包含，管理员应在服务器 `/etc/taskleaf/taskleaf.env` 的 `ALLOWED_HOSTS` 中保留原条目并追加这两项，再执行 `sudo systemctl restart taskleaf`。当前服务器已完成此调整。不要因此开放公网 API 端口或删除 Host 校验。
