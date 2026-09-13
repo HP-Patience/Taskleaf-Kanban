@@ -1,4 +1,4 @@
-# Taskleaf
+# Taskleaf-Kanban
 
 轻量的本地任务看板。使用 HTML、CSS 和原生 JavaScript 构建，通过 Vite 开发与打包，无运行时框架依赖。
 
@@ -58,3 +58,4 @@ npm run preview
 - `vite.config.js`：开发、预览端口与多页面构建配置。
 - `docs/images/taskleaf-board.png`：README 界面截图。
 - `package-lock.json`：锁定依赖版本；已有锁文件时可使用 `npm ci` 安装。
+
