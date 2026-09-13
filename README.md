@@ -86,7 +86,7 @@ npm run restore -- --offline-confirmed /absolute/path/backup.json
 
 **目前不含应用层登录。后端只允许回环监听；Nginx 模板默认仅监听回环且拒绝所有访问，必须在确定访问来源与保护传输方式后配置。不要直接将开发服务器或无保护 API 暴露到公网。**
 
-CI 在 push / PR 时测试和构建。只有仓库变量 `DEPLOY_ENABLED=true`、生产环境与 SSH Secrets 配齐后，才自动部署 main；当前未启用服务器部署。
+CI 在 push / PR 时测试和构建。只有仓库变量 `DEPLOY_ENABLED=true`、生产环境与 SSH Secrets 配齐后，才自动部署 main；当前已启用并验证服务器自动部署（2026-09-14）；推送 main 会自动发布，任务数据仍保存在服务器独立目录。
 
 详见：
 
