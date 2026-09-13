@@ -127,15 +127,15 @@ systemd 管理重启与日志；部署用户仅获得发布所需权限，不授
 ```text
 本地修改并验证 → push main → GitHub Actions
   → npm ci → 测试 → npm run build
-  → SSH 上传 dist、server、package.json、package-lock.json
-  → 服务器新版本目录安装生产依赖（npm ci --omit=dev）
+  → 生成隔离的生产依赖缓存，SSH 上传代码与缓存归档并校验 SHA-256
+  → 服务器新版本目录离线安装生产依赖（npm ci --offline --omit=dev --ignore-scripts）
   → 切换 current → 重启 systemd → 健康检查
 ```
 
 - Express 放入生产 dependencies，Vite 保留在 devDependencies。
-- 不从 CI 直接复制 node_modules 到服务器，避免系统或架构不一致。
+- 不从 CI 直接复制 node_modules 到服务器，避免系统或架构不一致。当前生产依赖已验证可离线安装；只传全新专用缓存的 _cacache，不传全局缓存。后续新增原生或平台相关依赖时需重新验证打包与服务器架构兼容性。
 - 工作流串行发布，防止两次部署交叉切换版本；Action 版本在实施时核验并固定。
-- SSH 私钥等凭据使用 GitHub Secrets；主机、端口和路径通过 Secrets 或 Variables 配置。
+- 使用独立 taskleaf-deploy 账号和专用 SSH 密钥；五项连接凭据存入 GitHub production Environment Secrets，仅 main 可部署，仓库 DEPLOY_ENABLED 开关控制是否发布。账号仅获指定 Taskleaf 重启 sudo 权限，不使用个人 work 私钥。
 - 仅同步发布目录，禁止将 rsync --delete 指向数据或备份目录。
 - 构建或安装失败时不切换现有版本；切换后健康检查失败时回滚代码并检查状态。
 - 回滚代码不回滚任务文件；涉及数据格式变化时先备份，并确保版本兼容或提供独立恢复方案。

@@ -32,7 +32,7 @@
 
 ## 3. GitHub 配置
 
-仓库 Secrets：
+`production` Environment Secrets（不将明文凭据写入仓库）：
 
 | 名称 | 内容 |
 | --- | --- |
@@ -42,18 +42,18 @@
 | SERVER_SSH_KEY | 专用部署私钥，不上传仓库 |
 | SERVER_KNOWN_HOSTS | 已通过可信通道核验的 SSH 主机公钥行，非默认端口使用对应 `[host]:port` 条目 |
 
-创建 `production` Environment，可设置审批人。仓库变量 `DEPLOY_ENABLED` 默认留空；确认服务器和安全配置就绪后才设为 `true`。
+已创建 `production` Environment，部署分支策略仅允许 `main`，以上五项 Secrets 已配置；未配置人工审批人。仓库变量 `DEPLOY_ENABLED=false`，待专用账号、SSH 登录及 runner 连通性验证后，经用户确认才设为 `true`。
 
 一旦启用，推送 main 会在测试通过后部署；任务完成后的提交确认必须明确提醒这一联动。
 
 ## 4. 发布过程
 
-- CI 安装依赖，跑 API 与独立浏览器测试，构建 dist。
-- 发布作业再次构建，打包 dist、server、共享 schema、备份恢复脚本、依赖清单和发布脚本。
+- CI 安装依赖，跑 API、Linux 发布控制流与独立浏览器测试，构建 dist。
+- 发布作业再次构建，执行 `deploy/package-release.sh`，打包 dist、server、共享 schema、备份恢复脚本、依赖清单、发布脚本和专用 npm 缓存。缓存由锁文件在全新目录生成，只打包 `_cacache`，不打包用户全局缓存、私钥、真实任务或本机 node_modules。
 - 使用带主机校验的 SSH 传输归档到 `/opt/taskleaf/releases/<commit>-<run>-<attempt>`。
-- 新目录运行 `npm ci --omit=dev`，安装失败不切换 current。
+- 服务器先校验归档 SHA-256，再解压并执行 `npm ci --offline --cache <release>/bundle-cache --omit=dev --ignore-scripts --no-audit --no-fund`；无需连接 npm registry。生产依赖安装与模块导入均成功后才切换 current。
 - 切换 current，重启 systemd，对回环 API 执行健康检查。
-- 失败时恢复上一个代码版本并重启；首次发布无旧版本时报告需要人工处理。
+- 切换后服务重启或健康检查失败时恢复上一个代码版本并重启，再验证回滚健康状态；无有效 current 时拒绝执行，首次安装使用 bootstrap 而不是发布脚本。
 - 不修改数据格式、不恢复旧任务文件、不删除历史发布目录；历史版本清理以后确认保留策略再配置。
 
 健康检查证明后端可读数据，但不替代公网端到端验收。首次配置后需从实际浏览器验证 Nginx、访问保护和保存功能。
@@ -118,7 +118,7 @@ ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18080:127.0.0.1:8080 DEPLOY_USER
 sudo bash /absolute/bundle-directory/bootstrap.sh /absolute/bundle-directory --resume-after-deps
 ```
 
-续装仍检查端口和正式安装路径，逐一核对发布包中的源文件哈希，并验证生产依赖；跳过解压和联网安装。该入口仅处理服务配置之前的依赖阶段失败，不用于一般升级或数据恢复。后续 CI 依赖下载通道仍需另行验证，不能由本次离线安装推断自动部署已可用。
+续装仍检查端口和正式安装路径，逐一核对发布包中的源文件哈希，并验证生产依赖；跳过解压和联网安装。该入口仅处理服务配置之前的依赖阶段失败，不用于一般升级或数据恢复。后续 CI 已改为由 runner 准备离线依赖缓存；实际 Actions 首次部署仍需单独验收，不能由离线安装推断完整自动部署已可用。
 
 ### Windows 本地端口与 SSH 隧道
 
@@ -158,3 +158,26 @@ sudo bash /absolute/upload-directory/enable-public.sh PUBLIC_IPV4 --allow-anonym
 修订模板保留原回环监听，另加主网卡 IPv4 监听，避免由回环切换到重叠通配地址的潜在冲突；通过 `ip -4 route get 1.1.1.1` 获取默认出口源地址，并在写入配置前替换模板占位符 `SERVER_PRIVATE_IPV4`。该方式面向当前单网卡、云公网地址映射的部署环境，多网卡需先人工核对。
 
 脚本 reload 后轮询实际网卡监听，并使用公网 Host 向网卡地址执行 HTTP 健康检查。任一失败即尝试恢复配置，不再只凭回环健康检查报告切换成功。脚本也识别上一版通配监听模板，允许从这一已知失败状态继续修复；不接受任意自定义配置。云安全组和外网验收仍需单独完成。
+
+## 10. 自动部署专用账号与当前进度
+
+采用与 `work`、运行服务的 `taskleaf` 分离的 `taskleaf-deploy` 账号。管理员先审核 `deploy/setup-ci.sh`，再将脚本和专用 Ed25519 **公钥**上传服务器；私钥仅保存在受限本地文件及 GitHub Environment Secret 中，不上传服务器或提交 Git。
+
+```bash
+sudo bash /home/work/taskleaf-ci-setup/setup-ci.sh /home/work/taskleaf-ci-setup/deploy_ed25519.pub
+```
+
+此路径为本次已经上传的安装材料目录。脚本会：
+
+- 创建锁定密码的部署账号，设置 home 与 `.ssh` 权限为 0700、公钥文件为 0600，并用 `restrict` 禁止密钥的端口转发及 PTY 等功能，保留部署需要的非交互命令。
+- 仅授予免密执行 `/usr/bin/systemctl restart taskleaf` 的 sudo 权限，不授予修改 Nginx、防火墙或任意 sudo 权限。
+- 只将 `/opt/taskleaf` 和 `/opt/taskleaf/releases` 两个目录本身交给部署账号，不递归更改历史版本、配置、数据和备份权限。
+- 不重启现有服务，不切换版本，不修改任务文件。若账号或配置已存在，拒绝覆盖；若中途失败，先检查部分配置再处理，不盲目重跑。
+
+权限边界：部署账号可以替换应用代码，因而其凭据仍能间接影响由服务用户访问的数据；独立账号及精确 sudo 不是对部署代码的沙箱。保护 GitHub 写权限与部署私钥，不把生产环境 Secrets 用于不受信任的 PR。
+
+2026-09-14 准备状态：Environment、五项 Secrets 和关闭状态的部署变量已配置；管理员已执行账号初始化；已用专用密钥及严格主机校验成功登录 taskleaf-deploy，核验发布目录可写、当前代码可读，以及仅允许指定服务重启的 sudo 权限。服务保持 active，回环与公网健康检查通过，公网页面 HTTP 200。未重启服务、切换版本或修改任务。未提交或推送本次代码，未启动首次自动部署。
+
+验证记录：`npm test` 12 项通过，前端构建通过；`tests/deploy.test.sh` 在 Linux 隔离目录覆盖成功、安装失败、模块导入失败、重启失败、健康检查失败回滚及非法版本号共 6 项。Windows Git Bash 的符号链接行为不同，不作为该脚本测试的验收环境。新发布包已在服务器独立临时目录通过 SHA-256 校验、真实离线生产依赖安装及模块导入；没有切换生产版本或修改真实任务。
+
+账号登录、发布目录权限及精确 sudo 权限已验证，但本机 SSH 成功不等同于 GitHub runner 可达。接下来按 `agent.md` 获取 commit、push 与首次部署确认；推送工作流时先保持部署开关关闭，验证 runner SSH 可达性后再启用开关并验收第一次 Actions 发布。启用后，每次 main 推送均会在测试通过后部署。停用自动发布可将仓库变量 `DEPLOY_ENABLED` 改为 `false`，这不停止当前网站。

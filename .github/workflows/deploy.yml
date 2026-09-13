@@ -4,6 +4,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      preflight_only:
+        description: Verify production SSH without deploying
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -20,12 +25,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: bash tests/deploy.test.sh
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
   deploy:
     needs: verify
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (vars.DEPLOY_ENABLED == 'true' || inputs.preflight_only == true)
     environment: production
     runs-on: ubuntu-latest
     steps:
@@ -35,6 +41,10 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci && npm run build
+        if: inputs.preflight_only != true
+      - name: Prepare offline production dependency bundle
+        if: inputs.preflight_only != true
+        run: bash deploy/package-release.sh "$RUNNER_TEMP/taskleaf-release"
       - name: Upload and activate release
         shell: bash
         env:
@@ -43,6 +53,7 @@ jobs:
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
           SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+          PREFLIGHT_ONLY: ${{ inputs.preflight_only }}
         run: |
           set -euo pipefail
           [[ "$SERVER_HOST" =~ ^[A-Za-z0-9.-]+$ ]] && [[ "$SERVER_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]
@@ -55,8 +66,15 @@ jobs:
           chmod 600 ~/.ssh/taskleaf_key ~/.ssh/known_hosts
           ssh_opts=(-i ~/.ssh/taskleaf_key -p "$SERVER_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10)
           remote="$SERVER_USER@$SERVER_HOST"
+          ssh "${ssh_opts[@]}" "$remote" 'set -eu; test -w /opt/taskleaf; test -w /opt/taskleaf/releases; test -r /opt/taskleaf/current/server/server.js; sudo -n -l /usr/bin/systemctl restart taskleaf; systemctl is-active taskleaf; curl --fail --silent --max-time 5 http://127.0.0.1:3000/api/health'
+          if [[ "$PREFLIGHT_ONLY" == true ]]; then
+            echo 'Runner SSH preflight passed; no deployment performed.'
+            exit 0
+          fi
           release_id="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           release="/opt/taskleaf/releases/$release_id"
-          tar -czf /tmp/taskleaf-release.tgz dist server src/schema.js scripts/backup.js scripts/restore.js package.json package-lock.json deploy/release.sh
-          ssh "${ssh_opts[@]}" "$remote" "mkdir -p '$release' && tar -xzf - -C '$release'" < /tmp/taskleaf-release.tgz
-          ssh "${ssh_opts[@]}" "$remote" "bash '$release/deploy/release.sh' '$release_id'"
+          bundle="$RUNNER_TEMP/taskleaf-release/release.tgz"
+          bundle_sha=$(sha256sum "$bundle" | cut -d ' ' -f 1)
+          [[ "$bundle_sha" =~ ^[a-f0-9]{64}$ ]]
+          ssh "${ssh_opts[@]}" "$remote" "umask 022; mkdir '$release' && cat > '$release/release.tgz'" < "$bundle"
+          ssh "${ssh_opts[@]}" "$remote" "set -eu; umask 022; cd '$release'; echo '$bundle_sha  release.tgz' | sha256sum --check -; tar --no-same-owner --no-same-permissions -xzf release.tgz; bash deploy/release.sh '$release_id'"
