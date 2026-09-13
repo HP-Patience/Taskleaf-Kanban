@@ -3,7 +3,7 @@
 - [docs/PRD.md](docs/PRD.md)：Taskleaf-Kanban 的产品目标、本期功能、范围边界、验收标准与待确认需求。
 - [docs/TECH_STACK.md](docs/TECH_STACK.md)：技术栈选择、目录规划、JSON 存储、API、systemd／Nginx 和 GitHub Actions 部署方案。
 
-开发前先按任务查阅对应文档。两份文档是需求与选型基线，实际实现和运行方式见 README；公网 IP＋端口访问已确认，访问保护与实际部署参数尚待确认。
+开发前先按任务查阅对应文档。两份文档是需求与选型基线，实际实现和运行方式见 README；公网 IP＋端口访问已确认；用户明确允许任何人查看和修改任务，身份验证与权限控制以后再做。公网启用与验证步骤见 DEPLOYMENT.md，不将脚本已上传等同于公网已可达。
 
 ## 任务完成后的提交与部署确认
 
