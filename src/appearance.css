@@ -46,3 +46,5 @@
 [data-theme="dark"] .header-button[aria-expanded="true"]{background:var(--soft);border-color:var(--accent);color:var(--accent)}
 @media(max-width:600px){.top{gap:10px}.top-actions{gap:8px;flex-wrap:wrap}.top-actions .local-status{order:3;flex-basis:100%;justify-content:flex-end;margin:0}.header-button{min-height:40px}.settings-panel{width:min(224px,calc(100vw - 76px))}}
 @media(max-width:600px){.top{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 8px}.top .brand{font-size:14px;gap:7px;grid-column:1;grid-row:1}.top-actions{display:contents}.settings-wrap{grid-column:2;grid-row:1}.theme-button{grid-column:3;grid-row:1}.top-actions .local-status{grid-column:1 / -1;grid-row:2;justify-content:flex-end}.settings-panel{top:calc(100% + 8px)}}
+
+#importText{min-height:180px;resize:vertical;font-family:ui-monospace,Consolas,monospace} .import-guide{margin:14px 0;color:var(--muted);font-size:13px} .import-guide summary{cursor:pointer;color:var(--ink)} .import-guide pre{white-space:pre-wrap;overflow-wrap:anywhere} #importPreview{overflow-wrap:anywhere} #importPreviewButton{margin:0 0 8px}

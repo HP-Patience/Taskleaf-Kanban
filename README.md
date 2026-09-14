@@ -94,3 +94,7 @@ CI 在 push / PR 时测试和构建。只有仓库变量 `DEPLOY_ENABLED=true`�
 - [技术选型](docs/TECH_STACK.md)
 - [服务器配置、CI/CD 与恢复操作](docs/DEPLOYMENT.md)
 - [任务完成后的提交确认规则](agent.md)
+
+## 粘贴 AI 任务 JSON
+
+设置 → 粘贴 JSON → 预览追加结果 → 确认导入，无需先保存为文件。每项至少提供 id 和 title，只追加新 ID，不覆盖已有任务；同 ID 同内容跳过，不同内容会提示冲突。输入示例与字段约束见 [助手录入任务](docs/TASK_INTAKE.md)。

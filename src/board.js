@@ -16,7 +16,7 @@ function storageWarning(text) {
   if ($('#importDialog').open) $('#importError').textContent = text;
 }
 function controls() {
-  document.querySelectorAll('#add,[data-add],[data-edit],[data-del],[data-archive],#form button,#form input,#form textarea,#form select,#confirm button,#importDialog button,#importFile,#importJson,#exportJson').forEach(el => {
+  document.querySelectorAll('#add,[data-add],[data-edit],[data-del],[data-archive],#form button,#form input,#form textarea,#form select,#confirm button,#importDialog button,#importDialog textarea,#importFile,#importJson,#pasteJson,#exportJson').forEach(el => {
     el.disabled = busy || (!loaded && !['x','cancel','cx','importClose'].includes(el.id));
   });
   $('#importConfirm').disabled = busy || !loaded || $('#importConfirm').dataset.blocked === 'true';
@@ -166,32 +166,72 @@ $('#exportJson').onclick = async () => {
   } catch (error) { storageWarning(error.message); }
   finally { busy = false; controls(); }
 };
+function invalidateImport() {
+  importing = null; importRevision = null;
+  $('#importConfirm').dataset.blocked = 'true';
+  $('#importSummary').textContent = '';
+  $('#importPreview').textContent = '';
+  $('#importError').textContent = '';
+  controls();
+}
 async function preview(value) {
-  if (busy) return;
-  busy = true; controls();
+  if (busy || !loaded) return;
+  invalidateImport(); busy = true; controls();
   try {
     const incoming = importTasks(value);
     const result = await request('/api/tasks/import/preview','POST',{data:incoming});
     importing = incoming; importRevision = result.revision;
     $('#importSummary').textContent = `新增 ${result.added.length} 项；重复 ${result.duplicates.length} 项；冲突 ${result.conflicts.length} 项。不会覆盖现有任务。`;
-    $('#importPreview').textContent = incoming.map(t=>t.title).join('\n');
-    $('#importError').textContent = result.conflicts.length ? '存在同 ID 不同内容的任务，请修改导入文件后重新预览。' : '';
+    $('#importPreview').textContent = [
+      ...result.added.map(t => `新增：${t.title}`),
+      ...result.duplicates.map(t => `跳过重复：${t.title}`),
+      ...result.conflicts.map(t => `冲突：${t.title}（${t.id}）`)
+    ].join('\n');
+    $('#importError').textContent = result.conflicts.length ? '存在同 ID 不同内容的任务，请核对并修改导入 JSON 后重新预览；不会覆盖原任务。' : '';
     $('#importConfirm').dataset.blocked = String(result.conflicts.length > 0 || result.added.length === 0);
-    $('#importDialog').showModal();
-  } catch (error) { storageWarning(error.message); }
-  finally { busy = false; controls(); $('#importConfirm').disabled = $('#importConfirm').dataset.blocked === 'true'; }
+  } catch (error) { $('#importError').textContent = '预览失败：'+error.message+' 输入已保留，请修改或重试。'; }
+  finally { busy = false; controls(); }
 }
+$('#pasteJson').onclick = () => {
+  if (busy || !loaded) return;
+  invalidateImport(); $('#importPasteFields').hidden = false;
+  $('#importDialog').showModal(); $('#importText').focus();
+};
+$('#importText').oninput = invalidateImport;
+$('#importPreviewButton').onclick = async () => {
+  if (busy) return;
+  invalidateImport();
+  try {
+    const text = $('#importText').value.trim();
+    if (!text) throw new Error('请先粘贴任务 JSON');
+    if (new TextEncoder().encode(text).length > 5*1024*1024) throw new Error('JSON 不能超过 5 MB');
+    let value;
+    try { value = JSON.parse(text); }
+    catch { throw new Error('JSON 语法无效，请检查引号、逗号，并移除 Markdown 代码围栏'); }
+    await preview(value);
+  } catch (error) { $('#importError').textContent = error.message; }
+};
 $('#importJson').onclick = () => $('#importFile').click();
 $('#importFile').onchange = async event => {
   const file = event.target.files[0]; event.target.value = '';
-  if (!file) return;
-  try { if (file.size > 5*1024*1024) throw new Error('文件不能超过 5 MB'); await preview(JSON.parse(await file.text())); }
-  catch (error) { storageWarning('导入文件无效：'+error.message); }
+  if (!file || busy) return;
+  invalidateImport(); $('#importPasteFields').hidden = true; $('#importDialog').showModal();
+  busy = true; controls();
+  let value;
+  try {
+    if (file.size > 5*1024*1024) throw new Error('文件不能超过 5 MB');
+    value = JSON.parse(await file.text());
+  } catch (error) { $('#importError').textContent = '导入文件无效：'+error.message; return; }
+  finally { busy = false; controls(); }
+  await preview(value);
 };
 $('#importClose').onclick = () => $('#importDialog').close();
 $('#importConfirm').onclick = async () => {
-  if ($('#importConfirm').dataset.blocked === 'true') return;
-  if (await commit('/api/tasks/import','POST',{data:importing},importRevision)) { $('#importDialog').close(); render(); note('任务已导入服务器'); }
+  if (!importing || $('#importConfirm').dataset.blocked === 'true') return;
+  if (await commit('/api/tasks/import','POST',{data:importing},importRevision)) {
+    if (!$('#importPasteFields').hidden) $('#importText').value = '';
+    $('#importDialog').close(); render(); note('任务已追加到服务器，原有任务已保留');
+  }
 };
 ['q','pf'].forEach(id => $('#'+id).addEventListener('input',render));
 $('#clear').onclick = () => { $('#q').value = ''; $('#pf').value = 'all'; render(); };
