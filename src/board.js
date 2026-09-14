@@ -1,4 +1,5 @@
 import './appearance.js';
+import {copyText} from './clipboard.js';
 import {request} from './api.js';
 import {document as validateDocument, importTasks} from './schema.js';
 const cols = [['todo','待处理'],['doing','进行中'],['review','待验收'],['done','已完成']];
@@ -16,7 +17,7 @@ function storageWarning(text) {
   if ($('#importDialog').open) $('#importError').textContent = text;
 }
 function controls() {
-  document.querySelectorAll('#add,[data-add],[data-edit],[data-del],[data-archive],#form button,#form input,#form textarea,#form select,#confirm button,#importDialog button,#importDialog textarea,#importFile,#importJson,#pasteJson,#exportJson').forEach(el => {
+  document.querySelectorAll('#add,[data-add],[data-edit],[data-del],[data-archive],#form button,#form input,#form textarea,#form select,#confirm button,#importDialog button,#importDialog textarea,#importFile,#importJson,#pasteJson,#exportJson,#copyJson').forEach(el => {
     el.disabled = busy || (!loaded && !['x','cancel','cx','importClose'].includes(el.id));
   });
   const archiveAll = $('#archiveAll');
@@ -193,6 +194,30 @@ $('#confirm').onclose = async () => {
   if ($('#confirm').returnValue === 'yes' && id && await commit('/api/tasks/'+encodeURIComponent(id),'DELETE',{},deleteRevision)) { render(); note('任务已删除'); }
 };
 for (const id of ['dlg','confirm','importDialog']) $('#'+id).addEventListener('cancel',event => { if (busy) event.preventDefault(); });
+$('#copyJson').onclick = async () => {
+  if (busy || !loaded) return;
+  if (!$('#settingsPanel').hidden) $('#settingsToggle').click();
+  $('#settingsToggle').focus({preventScroll:true});
+  busy = true; controls();
+  try {
+    // Match export: always read the complete server snapshot, not the filtered board.
+    const snapshot = validateDocument(await request());
+    const text = JSON.stringify(snapshot,null,2);
+    if (await copyText(text)) note('全部任务 JSON 已复制到剪贴板');
+    else {
+      $('#copyJsonText').value = text;
+      $('#copyJsonDialog').showModal();
+      $('#copyJsonText').focus(); $('#copyJsonText').select();
+    }
+  } catch (error) { storageWarning('复制 JSON 失败：'+error.message); }
+  finally { busy = false; controls(); }
+};
+$('#copyJsonClose').onclick = $('#copyJsonDone').onclick = () => $('#copyJsonDialog').close();
+$('#copyJsonSelect').onclick = () => { $('#copyJsonText').focus(); $('#copyJsonText').select(); };
+$('#copyJsonDialog').onclose = () => {
+  $('#copyJsonText').value = '';
+  $('#settingsToggle').focus({preventScroll:true});
+};
 $('#exportJson').onclick = async () => {
   if (busy) return;
   busy = true; controls();

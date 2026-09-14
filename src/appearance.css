@@ -65,3 +65,5 @@
 .colhead .archive-all{width:auto;min-height:32px;padding:4px 7px;font-size:12px;flex-shrink:0}
 .colhead .archive-all + [data-add]{margin-left:0;flex-shrink:0}
 @media(max-width:600px){.colhead .archive-all{min-height:36px}}
+
+#copyJsonText{min-height:220px;max-height:50dvh;resize:vertical;font-family:ui-monospace,Consolas,monospace}
