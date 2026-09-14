@@ -106,3 +106,42 @@ test('export document round-trip into a fresh server',async t=>{
   const restored = await b.api('/import','POST',{revision:0,data:snapshot});
   assert.deepEqual(restored.body.tasks,snapshot.tasks);
 });
+test('bulk archive touches only active completed tasks in one revision and preserves backup',async t=>{
+  const {store,api} = await setup(t);
+  const items = ['todo','doing','review','done','done'].map((st,i)=>({...item('bulk-'+i),st}));
+  items.push({...item('old'),st:'done',archived:true,archivedAt:'2026-09-01'});
+  await api('/import','POST',{revision:0,data:items});
+  const before = (await api()).body;
+  const result = await api('/archive-completed','POST',{revision:1,archivedAt:'2026-09-14'});
+  assert.equal(result.status,200); assert.equal(result.body.revision,2);
+  assert.deepEqual(result.body.tasks,before.tasks.map(t=>t.st==='done'&&!t.archived?{...t,archived:true,archivedAt:'2026-09-14'}:t));
+  assert.deepEqual(JSON.parse(await readFile(store.file+'.bak','utf8')),before);
+  assert.deepEqual(await new Store(store.file).read(),result.body);
+  const retry = await api('/archive-completed','POST',{revision:1,archivedAt:'2026-09-14'});
+  assert.equal(retry.status,409); assert.deepEqual((await api()).body,result.body);
+});
+test('bulk archive rejects bad dates and stale revisions without changing any tasks',async t=>{
+  const {api} = await setup(t);
+  await api('','POST',{revision:0,task:{...item(),st:'done'}});
+  const before = (await api()).body;
+  for (const archivedAt of [undefined,'','invalid','2026-02-30',123]) {
+    assert.equal((await api('/archive-completed','POST',{revision:1,archivedAt})).status,400);
+    assert.deepEqual((await api()).body,before);
+  }
+  assert.equal((await api('/archive-completed','POST',{revision:0,archivedAt:'2026-09-14'})).status,409);
+  assert.deepEqual((await api()).body,before);
+});
+test('bulk archive disk failure leaves the entire batch unchanged',async t=>{
+  const {store,api} = await setup(t);
+  await api('/import','POST',{revision:0,data:[{...item('a'),st:'done'},{...item('b'),st:'done'}]});
+  const before = (await api()).body;
+  const write = store.write;
+  store.write = async (file,data) => {
+    if (file===store.file) throw new Error('simulated bulk archive disk failure');
+    await write(file,data);
+  };
+  assert.equal((await api('/archive-completed','POST',{revision:1,archivedAt:'2026-09-14'})).status,500);
+  assert.deepEqual((await api()).body,before);
+  store.write = write;
+  assert.equal((await api('/archive-completed','POST',{revision:1,archivedAt:'2026-09-14'})).status,200);
+});

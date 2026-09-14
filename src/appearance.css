@@ -48,3 +48,20 @@
 @media(max-width:600px){.top{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 8px}.top .brand{font-size:14px;gap:7px;grid-column:1;grid-row:1}.top-actions{display:contents}.settings-wrap{grid-column:2;grid-row:1}.theme-button{grid-column:3;grid-row:1}.top-actions .local-status{grid-column:1 / -1;grid-row:2;justify-content:flex-end}.settings-panel{top:calc(100% + 8px)}}
 
 #importText{min-height:180px;resize:vertical;font-family:ui-monospace,Consolas,monospace} .import-guide{margin:14px 0;color:var(--muted);font-size:13px} .import-guide summary{cursor:pointer;color:var(--ink)} .import-guide pre{white-space:pre-wrap;overflow-wrap:anywhere} #importPreview{overflow-wrap:anywhere} #importPreviewButton{margin:0 0 8px}
+
+.description-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.description-expand{font-size:12px;min-height:32px;padding:4px 8px}
+.description-expand svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#descriptionDialog{animation:none;inset:0;margin:0;width:100%;max-width:none;height:100dvh;max-height:none;border:0;border-radius:0;overflow:auto}
+.description-modal{height:100%;min-height:320px;display:flex;flex-direction:column;gap:16px;padding:24px clamp(16px,4vw,64px)}
+.description-modal .mh{margin:0;flex-shrink:0}
+.description-editor{flex:1;min-height:0;grid-template-rows:auto minmax(0,1fr)}
+#descriptionText{height:100%;min-height:0;resize:none;font-size:16px;line-height:1.8;padding:16px}
+.description-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;border-top:1px solid var(--line);padding-top:16px}
+.description-footer p{margin:0}
+.description-footer button{flex-shrink:0}
+@media(max-width:600px){.description-modal{padding:16px;gap:12px}.description-footer{align-items:flex-start;flex-direction:column;gap:10px}.description-footer button{align-self:flex-end}.description-expand{min-height:40px}}
+
+.colhead .archive-all{width:auto;min-height:32px;padding:4px 7px;font-size:12px;flex-shrink:0}
+.colhead .archive-all + [data-add]{margin-left:0;flex-shrink:0}
+@media(max-width:600px){.colhead .archive-all{min-height:36px}}

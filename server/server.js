@@ -45,6 +45,12 @@ export function createApp(store, {allowedHosts = ['127.0.0.1:4173','localhost:41
       return [...items,...preview.added];
     });
   });
+  app.post('/api/tasks/archive-completed', async (req,res) => {
+    const {archivedAt} = req.body || {};
+    if (typeof archivedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(archivedAt) || !Number.isFinite(Date.parse(archivedAt)) || new Date(archivedAt).toISOString().slice(0,10) !== archivedAt) throw new InputError('归档日期无效');
+    // One revision check and atomic write: the batch cannot be partially archived.
+    await update(req,res,items => items.map(t => t.st === 'done' && !t.archived ? {...t,archived:true,archivedAt} : t));
+  });
   app.post('/api/tasks/reorder', async (req,res) => {
     const {id,st,beforeId} = req.body || {};
     if (!states.includes(st)) throw new InputError('目标列无效');

@@ -19,6 +19,8 @@ function controls() {
   document.querySelectorAll('#add,[data-add],[data-edit],[data-del],[data-archive],#form button,#form input,#form textarea,#form select,#confirm button,#importDialog button,#importDialog textarea,#importFile,#importJson,#pasteJson,#exportJson').forEach(el => {
     el.disabled = busy || (!loaded && !['x','cancel','cx','importClose'].includes(el.id));
   });
+  const archiveAll = $('#archiveAll');
+  if (archiveAll) archiveAll.disabled = busy || !loaded || !data.some(t => t.st === 'done' && !t.archived);
   $('#importConfirm').disabled = busy || !loaded || $('#importConfirm').dataset.blocked === 'true';
   document.querySelectorAll('.task').forEach(el => { el.draggable = !busy && loaded && !archivePage; });
 }
@@ -67,7 +69,8 @@ function render() {
   $('#board').setAttribute('aria-label', archivePage ? '归档任务' : '任务看板');
   $('#board').innerHTML = archivePage ? archiveGroups(visible, !!q || priority !== 'all') : cols.map(([status,label]) => {
     const tasks = visible.filter(t => t.st === status);
-    return '<section class="col" data-status="'+status+'"><div class="colhead"><span class="status-dot" aria-hidden="true"></span>'+label+'<span class="count">'+tasks.length+'</span><button class="ghost" data-add="'+status+'" aria-label="在'+label+'中新建任务" title="新建任务">＋</button></div><div class="drop" data-st="'+status+'">'+(tasks.length ? tasks.map(card).join('') : '<div class="empty">'+(q || priority !== 'all' ? '没有匹配的任务' : '暂无任务')+'</div>')+'</div></section>';
+    const archiveAll = status === 'done' ? '<button class="ghost archive-all" id="archiveAll" title="归档所有已完成任务（包括筛选隐藏的任务），可在归档页恢复" aria-label="全部归档（所有已完成任务，共 '+completed+' 项）">全部归档</button>' : '';
+    return '<section class="col" data-status="'+status+'"><div class="colhead"><span class="status-dot" aria-hidden="true"></span>'+label+'<span class="count">'+tasks.length+'</span>'+archiveAll+'<button class="ghost" data-add="'+status+'" aria-label="在'+label+'中新建任务" title="新建任务">＋</button></div><div class="drop" data-st="'+status+'">'+(tasks.length ? tasks.map(card).join('') : '<div class="empty">'+(q || priority !== 'all' ? '没有匹配的任务' : '暂无任务')+'</div>')+'</div></section>';
   }).join('');
   drag(); controls();
 }
@@ -125,6 +128,32 @@ function drag() {
 $('#add').onclick = () => openForm();
 $('#boardBtn').onclick = () => setView(false); $('#archiveBtn').onclick = () => setView(true);
 $('#x').onclick = $('#cancel').onclick = () => $('#dlg').close();
+// Fullscreen editing changes only the current form draft, never server data.
+$('#expandDescription').onclick = () => {
+  if (busy || !loaded) return;
+  const source = $('#desc'), editor = $('#descriptionText');
+  editor.value = source.value;
+  editor.maxLength = source.maxLength;
+  $('#descriptionDialog').showModal();
+  editor.focus();
+  editor.setSelectionRange(source.selectionStart, source.selectionEnd, source.selectionDirection);
+  editor.scrollTop = source.scrollTop;
+};
+$('#descriptionText').oninput = () => { $('#desc').value = $('#descriptionText').value; };
+$('#collapseDescription').onclick = $('#finishDescription').onclick = () => $('#descriptionDialog').close();
+$('#descriptionDialog').addEventListener('keydown', event => {
+  if (event.key !== 'Tab') return;
+  const first = $('#collapseDescription'), last = $('#finishDescription');
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
+$('#descriptionDialog').onclose = () => {
+  const source = $('#desc'), editor = $('#descriptionText');
+  source.value = editor.value;
+  source.setSelectionRange(editor.selectionStart, editor.selectionEnd, editor.selectionDirection);
+  source.scrollTop = editor.scrollTop;
+  if ($('#dlg').open) $('#expandDescription').focus({preventScroll:true});
+};
 $('#cx').onclick = () => $('#confirm').close('cancel');
 $('#title').oninput = () => $('#title').setCustomValidity('');
 $('#form').onsubmit = async event => {
@@ -140,6 +169,15 @@ $('#form').onsubmit = async event => {
 };
 document.addEventListener('click', async event => {
   if (busy) return;
+  if (event.target.closest('#archiveAll')) {
+    if (!loaded || archivePage) return;
+    const count = data.filter(t => t.st === 'done' && !t.archived).length;
+    if (!count) return;
+    if (await commit('/api/tasks/archive-completed','POST',{archivedAt:localDay()})) {
+      render(); $('#archiveBtn').focus({preventScroll:true}); note('已归档 '+count+' 项已完成任务，可在归档页恢复');
+    }
+    return;
+  }
   const add = event.target.closest('[data-add]'), editButton = event.target.closest('[data-edit]'), archive = event.target.closest('[data-archive]'), del = event.target.closest('[data-del]');
   if (add) openForm(null,add.dataset.add);
   if (editButton) openForm(editButton.dataset.edit);
