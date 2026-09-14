@@ -1,0 +1,3 @@
+interface:
+  display_name: "task-kanban-json"
+  short_description: "为 Taskleaf-Kanban 澄清任务需求，生成可追加导入的 JSON"
