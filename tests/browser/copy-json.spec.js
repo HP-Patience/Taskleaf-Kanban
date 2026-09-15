@@ -6,7 +6,10 @@ async function copy(page) {
 }
 test.beforeEach(async({page,request})=>{
   let state=await snapshot(request);
-  for (const t of state.tasks) state=await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+  for (const t of state.tasks) {
+    if (!t.deletedAt) state = await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+    state = await (await request.delete('/api/tasks/'+t.id+'/permanent',{data:{revision:state.revision,confirm:true}})).json();
+  }
   await request.post('/api/tasks/import',{data:{revision:state.revision,data:[
     {id:'active-copy',title:'活动任务',desc:'包含换行\n引号 " 与中文'},
     {id:'archived-copy',title:'归档任务',st:'done',archived:true,archivedAt:'2026-09-14'}
@@ -27,7 +30,7 @@ test('copies a fresh complete server snapshot to the actual clipboard, regardles
   const current=await snapshot(request);
   await page.locator('#q').fill('不存在的筛选');
   await copy(page);
-  await expect(page.locator('#toast')).toHaveText('全部任务 JSON 已复制到剪贴板');
+  await expect(page.locator('#toastMessage')).toHaveText('全部任务 JSON 已复制到剪贴板');
   const text=await page.evaluate(()=>navigator.clipboard.readText());
   expect(text.replace(/\r\n/g,'\n')).toBe(JSON.stringify(current,null,2));
   expect(await snapshot(request)).toEqual(current);
@@ -45,7 +48,7 @@ for (const mode of ['unavailable','denied']) {
     },mode);
     const before=await snapshot(request);
     await copy(page);
-    await expect(page.locator('#toast')).toHaveText('全部任务 JSON 已复制到剪贴板');
+    await expect(page.locator('#toastMessage')).toHaveText('全部任务 JSON 已复制到剪贴板');
     expect(await page.evaluate(()=>window.copyFallback)).toEqual({command:'copy',text:JSON.stringify(before,null,2),selection:JSON.stringify(before,null,2)});
     await expect(page.getByLabel('临时复制内容')).toHaveCount(0);
     await expect(page.locator('#settingsToggle')).toBeFocused();
@@ -93,7 +96,10 @@ test('failed fetch never copies stale data and retry works',async({page,request}
 });
 test('button is disabled while fetching and empty snapshot can be copied',async({page,request})=>{
   let state=await snapshot(request);
-  for(const t of state.tasks) state=await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+  for (const t of state.tasks) {
+    if (!t.deletedAt) state = await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+    state = await (await request.delete('/api/tasks/'+t.id+'/permanent',{data:{revision:state.revision,confirm:true}})).json();
+  }
   let release;
   const gate=new Promise(resolve=>{release=resolve;});
   await page.route('**/api/tasks',async route=>{await gate;await route.continue();});

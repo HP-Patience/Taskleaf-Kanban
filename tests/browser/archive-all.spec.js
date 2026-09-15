@@ -2,7 +2,10 @@ import {test,expect} from '@playwright/test';
 const snapshot = async request => (await request.get('/api/tasks')).json();
 test.beforeEach(async({page,request})=>{
   let state=await snapshot(request);
-  for (const t of state.tasks) state=await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+  for (const t of state.tasks) {
+    if (!t.deletedAt) state = await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+    state = await (await request.delete('/api/tasks/'+t.id+'/permanent',{data:{revision:state.revision,confirm:true}})).json();
+  }
   await request.post('/api/tasks/import',{data:{revision:state.revision,data:[
     {id:'open',title:'未完成任务',st:'doing'},
     {id:'done-a',title:'完成任务甲',st:'done',pri:'high'},

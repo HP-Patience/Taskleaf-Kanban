@@ -67,3 +67,28 @@
 @media(max-width:600px){.colhead .archive-all{min-height:36px}}
 
 #copyJsonText{min-height:220px;max-height:50dvh;resize:vertical;font-family:ui-monospace,Consolas,monospace}
+
+/* Task progress controls reuse the board's colors and native form elements. */
+.tabs{flex-shrink:1;flex-wrap:wrap;gap:16px}.viewbar{flex-wrap:wrap}
+.board.list-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));align-items:start;overflow:visible}
+.list-view .empty{grid-column:1 / -1;padding:56px 16px}.list-view .task{cursor:default}
+.due-notice{border:1px solid var(--line);border-radius:6px;padding:12px 16px;margin-bottom:20px;color:var(--muted)}
+.due-notice summary{cursor:pointer;font-weight:600}.due-notice ul{list-style:none;padding:0;margin:12px 0 0}.due-notice li{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:6px 0}.due-notice button{white-space:normal;text-align:left}
+.blocked-copy{font-size:12px;color:var(--red);overflow-wrap:anywhere;margin:8px 0}.task.is-blocked{border-left:3px solid var(--red)}
+.checklist-progress{font-size:12px;color:var(--accent);margin:8px 0}.card-actions [data-focus][aria-pressed="true"]{color:var(--accent);background:var(--soft)}
+.card-actions [data-purge]{margin-left:auto;color:var(--red)}
+.task-extras{display:grid;gap:12px;border-top:1px solid var(--line);margin-top:18px;padding-top:18px}.task-extras h3{font-size:13px;margin:0}.task-extras p{margin:0;font-size:12px}
+.check-label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}input[type="checkbox"]{accent-color:var(--accent);width:18px;height:18px;flex-shrink:0}
+#checklistEditor{display:grid;gap:8px}.checklist-step{display:flex;align-items:center;gap:8px}.checklist-step input[type="text"]{min-width:0;flex:1;border:1px solid var(--line);border-radius:5px;background:var(--surface);padding:8px;color:var(--ink)}.checklist-step:has(input:checked) input[type="text"]{text-decoration:line-through;color:var(--muted)}.checklist-step .ghost{padding:5px 8px}
+.toast.show{pointer-events:auto}.toast{display:flex;align-items:center;gap:12px}.toast .ghost{min-height:30px;font-size:12px}
+@media(max-width:600px){.tabs{gap:12px}.tab{font-size:12px;gap:4px}.task-extras .description-heading{gap:8px}.board.list-view{grid-template-columns:minmax(0,1fr)}}
+
+.card-checklist{list-style:none;padding:0;margin:8px 0 12px;display:grid;gap:2px}
+.card-checklist label{display:flex;align-items:flex-start;gap:8px;min-height:32px;padding:5px 0;font-size:13px;line-height:1.6;cursor:pointer}
+.card-checklist input{margin:2px 0 0}.card-checklist span{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.card-checklist input:checked + span{text-decoration:line-through;color:var(--muted)}
+.card-checklist label:has(input:disabled){cursor:default}
+
+button.checklist-save-lock:disabled{opacity:1}
+
+.local-status{min-width:16em;white-space:nowrap;font-variant-numeric:tabular-nums}

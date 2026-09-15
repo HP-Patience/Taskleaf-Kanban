@@ -8,7 +8,10 @@ async function add(page,title) {
 }
 test.beforeEach(async ({request})=>{
   let snapshot = await (await request.get('/api/tasks')).json();
-  for (const t of snapshot.tasks) snapshot = await (await request.delete('/api/tasks/'+t.id,{data:{revision:snapshot.revision}})).json();
+  for (const t of snapshot.tasks) {
+    if (!t.deletedAt) snapshot = await (await request.delete('/api/tasks/'+t.id,{data:{revision:snapshot.revision}})).json();
+    snapshot = await (await request.delete('/api/tasks/'+t.id+'/permanent',{data:{revision:snapshot.revision,confirm:true}})).json();
+  }
 });
 test('independent browser contexts share server tasks; edit, archive, restore, delete persist',async({page,browser})=>{
   await ready(page); await add(page,'跨浏览器任务');

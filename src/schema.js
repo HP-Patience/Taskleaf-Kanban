@@ -2,21 +2,28 @@ export class InputError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
 }
 export const states = ['todo', 'doing', 'review', 'done'];
-const keys = ['id','title','desc','pri','who','due','tag','st','archived','archivedAt'];
+const keys = ['id','title','desc','pri','who','due','tag','st','archived','archivedAt','focusDate','checklist','blocked','blockedReason','deletedAt'];
 const fail = message => { throw new InputError(message); };
 export function task(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) fail('任务格式无效');
   if (Object.keys(input).some(key => !keys.includes(key))) fail('包含不支持的任务字段');
-  const t = {id:input.id, title:input.title, desc:'', pri:'medium', who:'', due:'', tag:'', st:'todo', archived:false, archivedAt:'', ...input};
-  for (const [key, max] of Object.entries({id:100,title:100,desc:500,who:100,due:10,tag:18,archivedAt:10})) {
+  const t = {id:input.id, title:input.title, desc:'', pri:'medium', who:'', due:'', tag:'', st:'todo', archived:false, archivedAt:'', focusDate:'', checklist:[], blocked:false, blockedReason:'', deletedAt:'', ...input};
+  for (const [key, max] of Object.entries({id:100,title:100,desc:500,who:100,due:10,tag:18,archivedAt:10,focusDate:10,blockedReason:200,deletedAt:24})) {
     if (typeof t[key] !== 'string' || t[key].length > max) fail(`${key} 格式或长度无效`);
   }
   if (!/^[a-zA-Z0-9_-]+$/.test(t.id) || !t.title.trim()) fail('ID 或标题无效');
   t.title = t.title.trim();
   if (!states.includes(t.st) || !['high','medium','low'].includes(t.pri) || typeof t.archived !== 'boolean') fail('状态或优先级无效');
-  for (const key of ['due','archivedAt']) {
+  for (const key of ['due','archivedAt','focusDate']) {
     if (t[key] && (!/^\d{4}-\d{2}-\d{2}$/.test(t[key]) || !Number.isFinite(Date.parse(t[key])) || new Date(t[key]).toISOString().slice(0,10) !== t[key])) fail('日期无效');
   }
+  if (typeof t.blocked !== 'boolean') fail('受阻标记无效');
+  if (t.deletedAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(t.deletedAt) || !Number.isFinite(Date.parse(t.deletedAt)) || new Date(t.deletedAt).toISOString() !== t.deletedAt)) fail('删除时间无效');
+  if (!Array.isArray(t.checklist) || t.checklist.length > 100) fail('检查清单不能超过 100 项');
+  t.checklist = t.checklist.map(step => {
+    if (!step || typeof step !== 'object' || Array.isArray(step) || Object.keys(step).some(key => !['text','done'].includes(key)) || typeof step.text !== 'string' || !step.text.trim() || step.text.length > 200 || typeof step.done !== 'boolean') fail('检查清单项无效（文字 1–200 字，done 为布尔值）');
+    return {text:step.text.trim(),done:step.done};
+  });
   if (t.archived && t.st !== 'done') fail('只有已完成任务可以归档');
   return t;
 }

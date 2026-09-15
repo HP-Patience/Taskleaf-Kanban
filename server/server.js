@@ -49,16 +49,16 @@ export function createApp(store, {allowedHosts = ['127.0.0.1:4173','localhost:41
     const {archivedAt} = req.body || {};
     if (typeof archivedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(archivedAt) || !Number.isFinite(Date.parse(archivedAt)) || new Date(archivedAt).toISOString().slice(0,10) !== archivedAt) throw new InputError('归档日期无效');
     // One revision check and atomic write: the batch cannot be partially archived.
-    await update(req,res,items => items.map(t => t.st === 'done' && !t.archived ? {...t,archived:true,archivedAt} : t));
+    await update(req,res,items => items.map(t => t.st === 'done' && !t.archived && !t.deletedAt ? {...t,archived:true,archivedAt} : t));
   });
   app.post('/api/tasks/reorder', async (req,res) => {
     const {id,st,beforeId} = req.body || {};
     if (!states.includes(st)) throw new InputError('目标列无效');
     await update(req,res,items => {
       const moving = items.find(t => t.id === id);
-      if (!moving || moving.archived) throw new InputError('任务不存在或已归档',404);
+      if (!moving || moving.archived || moving.deletedAt) throw new InputError('任务不存在或已归档',404);
       const rest = items.filter(t => t.id !== id);
-      const index = beforeId ? rest.findIndex(t => t.id === beforeId && t.st === st && !t.archived) : -1;
+      const index = beforeId ? rest.findIndex(t => t.id === beforeId && t.st === st && !t.archived && !t.deletedAt) : -1;
       if (beforeId && index < 0) throw new InputError('排序目标无效');
       rest.splice(index < 0 ? rest.length : index,0,{...moving,st});
       return rest;
@@ -66,16 +66,29 @@ export function createApp(store, {allowedHosts = ['127.0.0.1:4173','localhost:41
   });
   app.patch('/api/tasks/:id', async (req,res) => {
     const changes = req.body?.changes;
-    if (!changes || typeof changes !== 'object' || Array.isArray(changes) || 'id' in changes) throw new InputError('更新字段无效');
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes) || 'id' in changes || 'deletedAt' in changes) throw new InputError('更新字段无效');
     await update(req,res,items => {
-      if (!items.some(t => t.id === req.params.id)) throw new InputError('任务不存在',404);
+      if (!items.some(t => t.id === req.params.id && !t.deletedAt)) throw new InputError('任务不存在或已删除',404);
       return items.map(t => t.id === req.params.id ? task({...t,...changes}) : t);
+    });
+  });
+  app.post('/api/tasks/:id/restore', async (req,res) => {
+    await update(req,res,items => {
+      if (!items.some(t => t.id === req.params.id && t.deletedAt)) throw new InputError('最近删除中没有此任务',404);
+      return items.map(t => t.id === req.params.id ? {...t,deletedAt:''} : t);
+    });
+  });
+  app.delete('/api/tasks/:id/permanent', async (req,res) => {
+    if (req.body?.confirm !== true) throw new InputError('请确认永久删除');
+    await update(req,res,items => {
+      if (!items.some(t => t.id === req.params.id && t.deletedAt)) throw new InputError('只能永久删除最近删除中的任务',400);
+      return items.filter(t => t.id !== req.params.id);
     });
   });
   app.delete('/api/tasks/:id', async (req,res) => {
     await update(req,res,items => {
       if (!items.some(t => t.id === req.params.id)) throw new InputError('任务不存在',404);
-      return items.filter(t => t.id !== req.params.id);
+      return items.map(t => t.id === req.params.id && !t.deletedAt ? {...t,deletedAt:new Date().toISOString()} : t);
     });
   });
   app.use('/api', (req,res) => res.status(404).json({error:'接口不存在'}));

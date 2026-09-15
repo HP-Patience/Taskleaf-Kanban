@@ -2,7 +2,10 @@ import {test,expect} from '@playwright/test';
 const snapshot = async request => (await request.get('/api/tasks')).json();
 test.beforeEach(async ({page,request}) => {
   let state = await snapshot(request);
-  for (const task of state.tasks) state = await (await request.delete('/api/tasks/'+task.id,{data:{revision:state.revision}})).json();
+  for (const task of state.tasks) {
+    if (!task.deletedAt) state = await (await request.delete('/api/tasks/'+task.id,{data:{revision:state.revision}})).json();
+    state = await (await request.delete('/api/tasks/'+task.id+'/permanent',{data:{revision:state.revision,confirm:true}})).json();
+  }
   await page.goto('/task-board.html');
   await expect(page.locator('#saveStatus')).toContainText('已连接服务器');
 });

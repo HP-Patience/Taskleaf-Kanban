@@ -11,7 +11,10 @@ async function preview(page,items) {
 }
 test.beforeEach(async ({page,request}) => {
   let state = await snapshot(request);
-  for (const t of state.tasks) state = await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+  for (const t of state.tasks) {
+    if (!t.deletedAt) state = await (await request.delete('/api/tasks/'+t.id,{data:{revision:state.revision}})).json();
+    state = await (await request.delete('/api/tasks/'+t.id+'/permanent',{data:{revision:state.revision,confirm:true}})).json();
+  }
   await request.post('/api/tasks',{data:{revision:state.revision,task:{id:'existing',title:'原有任务',st:'doing'}}});
   await page.goto('/task-board.html');
   await expect(page.locator('#saveStatus')).toContainText('已连接服务器');

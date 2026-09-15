@@ -13,7 +13,7 @@ test('backup and offline restore preserve tasks and invalidate old revisions',as
   const file = join(dir,'tasks.json'), backups = join(dir,'backups');
   const env = {DATA_FILE:file,BACKUP_DIR:backups};
   const store = new Store(file); await store.init();
-  const saved = await store.mutate(0,()=>[task({id:'restore-test',title:'保留字段',desc:'备份内容',st:'done',archived:true,archivedAt:'2026-09-14'})]);
+  const saved = await store.mutate(0,()=>[task({id:'restore-test',title:'保留字段',desc:'备份内容',focusDate:'2026-09-16',checklist:[{text:'备份步骤',done:true}],blocked:true,blockedReason:'等待',deletedAt:'2026-09-16T00:00:00.000Z',st:'done',archived:true,archivedAt:'2026-09-14'})]);
   const result = run('backup.js',env); assert.equal(result.status,0,result.stderr);
   const backup = join(backups,(await readdir(backups))[0]);
   assert.deepEqual(JSON.parse(await readFile(backup,'utf8')),saved);
